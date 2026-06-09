@@ -6,7 +6,6 @@ from amazon_extractor import buscar_precio_amazon
 from fb_extractor import obtener_posts_monterrey
 from processor import analizar_demanda_y_marcas
 
-# ── Página ──────────────────────────────────────────────────
 st.set_page_config(
     page_title="Radar Compra-Venta Monterrey",
     page_icon="📡",
@@ -16,11 +15,8 @@ st.title("📡 Radar de Compra-Venta — Monterrey")
 st.caption("Cruza demanda de Facebook con precios de Mercado Libre y Amazon")
 
 if st.button("🔄 Actualizar datos"):
-    st.cache_data.clear()
     st.rerun()
 
-# ── Pipeline ────────────────────────────────────────────────
-@st.cache_data(ttl=600)
 def correr_pipeline():
     posts = obtener_posts_monterrey()
     df    = analizar_demanda_y_marcas(posts)
@@ -52,7 +48,6 @@ def correr_pipeline():
 
     return pd.DataFrame(filas).sort_values("Menciones FB", ascending=False)
 
-# ── Carga ───────────────────────────────────────────────────
 with st.spinner("Analizando mercado..."):
     df = correr_pipeline()
 
@@ -60,7 +55,6 @@ if df.empty:
     st.warning("No se encontraron productos con intención de compra.")
     st.stop()
 
-# ── Métricas ────────────────────────────────────────────────
 c1, c2, c3 = st.columns(3)
 c1.metric("Productos detectados", len(df))
 c2.metric("Total menciones FB",   int(df["Menciones FB"].sum()))
@@ -69,14 +63,12 @@ if not ganancias.empty:
     c3.metric("Mejor oportunidad", f"${ganancias.max():,.0f} MXN")
 
 st.divider()
-
-# ── Tabla con colores en HTML ────────────────────────────────
 st.subheader("📊 Ranking de Oportunidades")
 
 def fmt(v, sin_dato="—"):
     try:
         return f"${v:,.0f}" if pd.notna(v) else sin_dato
-    except Exception:
+    except:
         return sin_dato
 
 def fila_a_html(row):
@@ -86,7 +78,6 @@ def fila_a_html(row):
         gan_td = f'<td style="color:{color};font-weight:bold">{fmt(gan)}</td>'
     else:
         gan_td = "<td>—</td>"
-
     return (
         f"<tr>"
         f"<td>{row['Producto']}</td>"
@@ -105,14 +96,10 @@ cabeceras = ["Producto","Marca","Menciones FB","Presupuesto FB",
 ths = "".join(f"<th>{h}</th>" for h in cabeceras)
 trs = "".join(fila_a_html(row) for _, row in df.iterrows())
 
-tabla_html = f"""
+st.markdown(f"""
 <style>
-  .radar-tabla {{
-    width:100%; border-collapse:collapse; font-size:14px;
-  }}
-  .radar-tabla th {{
-    background:#1e3a5f; color:white; padding:8px 12px; text-align:left;
-  }}
+  .radar-tabla {{ width:100%; border-collapse:collapse; font-size:14px; }}
+  .radar-tabla th {{ background:#1e3a5f; color:white; padding:8px 12px; text-align:left; }}
   .radar-tabla tr:nth-child(even) {{ background:#f0f4ff; }}
   .radar-tabla td {{ padding:7px 12px; border-bottom:1px solid #dde3f0; }}
 </style>
@@ -120,32 +107,20 @@ tabla_html = f"""
   <thead><tr>{ths}</tr></thead>
   <tbody>{trs}</tbody>
 </table>
-"""
-st.markdown(tabla_html, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# ── Gráfica ─────────────────────────────────────────────────
 st.subheader("🔥 Productos más buscados en Facebook")
-
 fig = px.bar(
-    df,
-    x="Menciones FB",
-    y="Producto",
-    orientation="h",
-    color="Menciones FB",
-    color_continuous_scale="Blues",
-    text="Menciones FB",
+    df, x="Menciones FB", y="Producto", orientation="h",
+    color="Menciones FB", color_continuous_scale="Blues", text="Menciones FB",
 )
 fig.update_layout(
-    yaxis=dict(autorange="reversed"),
-    showlegend=False,
-    height=max(300, len(df) * 55),
-    plot_bgcolor="white",
+    yaxis=dict(autorange="reversed"), showlegend=False,
+    height=max(300, len(df) * 55), plot_bgcolor="white",
 )
 st.plotly_chart(fig, use_container_width=True)
 
-# ── Comparador ──────────────────────────────────────────────
 st.subheader("💰 Comparador de Precios por Producto")
-
 producto_sel = st.selectbox("Selecciona un producto:", df["Producto"].tolist())
 fila = df[df["Producto"] == producto_sel].iloc[0]
 
@@ -163,4 +138,4 @@ else:
     st.info("ℹ️ Sin suficientes datos de precio para calcular ganancia.")
 
 st.divider()
-st.caption("Facebook simulado · MeLi vía API pública · Amazon vía scraping (puede variar)")
+st.caption("Facebook simulado · Precios de referencia MeLi y Amazon · Monterrey NL")
