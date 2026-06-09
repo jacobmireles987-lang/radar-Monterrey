@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from ml_extractor import buscar_precio_promedio_ml
-from amazon_extractor import buscar_precio_amazon
+import requests
+from ml_extractor import obtener_tendencias_ml
+from amazon_extractor import obtener_mas_vendido_amazon
 from fb_extractor import obtener_posts_monterrey
 from processor import analizar_demanda_y_marcas
 
@@ -12,130 +13,139 @@ st.set_page_config(
     layout="wide"
 )
 st.title("📡 Radar de Compra-Venta — Monterrey")
-st.caption("Cruza demanda de Facebook con precios de Mercado Libre y Amazon")
+st.caption("Lo más vendido en Mercado Libre y Amazon · Demanda en Facebook MTY")
 
 if st.button("🔄 Actualizar datos"):
     st.rerun()
 
-def correr_pipeline():
-    posts = obtener_posts_monterrey()
-    df    = analizar_demanda_y_marcas(posts)
-    if df.empty:
-        return pd.DataFrame()
+# ── SECCIÓN 1: Tendencias Mercado Libre ─────────────────────
+st.header("🛒 Tendencias en Mercado Libre México")
 
-    filas = []
-    for _, row in df.iterrows():
-        termino    = f"{row['Producto']} {row['Marca']}".strip()
-        precio_ml  = buscar_precio_promedio_ml(termino)
-        precio_amz = buscar_precio_amazon(termino)
-
-        precios_validos = [p for p in [precio_ml, precio_amz] if p and p > 0]
-        mejor_costo     = min(precios_validos) if precios_validos else None
-        presupuesto_fb  = row.get("Presupuesto_FB", None)
-        ganancia        = (presupuesto_fb - mejor_costo
-                           if presupuesto_fb and mejor_costo else None)
-
-        filas.append({
-            "Producto"      : row["Producto"],
-            "Marca"         : row["Marca"],
-            "Menciones FB"  : int(row["Menciones"]),
-            "Presupuesto FB": presupuesto_fb,
-            "Precio MeLi"   : precio_ml,
-            "Precio Amazon" : precio_amz,
-            "Mejor Costo"   : mejor_costo,
-            "Ganancia Est." : ganancia,
-        })
-
-    return pd.DataFrame(filas).sort_values("Menciones FB", ascending=False)
-
-with st.spinner("Analizando mercado..."):
-    df = correr_pipeline()
-
-if df.empty:
-    st.warning("No se encontraron productos con intención de compra.")
-    st.stop()
-
-c1, c2, c3 = st.columns(3)
-c1.metric("Productos detectados", len(df))
-c2.metric("Total menciones FB",   int(df["Menciones FB"].sum()))
-ganancias = df["Ganancia Est."].dropna()
-if not ganancias.empty:
-    c3.metric("Mejor oportunidad", f"${ganancias.max():,.0f} MXN")
-
-st.divider()
-st.subheader("📊 Ranking de Oportunidades")
-
-def fmt(v, sin_dato="—"):
+with st.spinner("Consultando Mercado Libre..."):
     try:
-        return f"${v:,.0f}" if pd.notna(v) else sin_dato
+        url = "https://api.mercadolibre.com/trends/MLM"
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            tendencias = res.json()[:10]
+        else:
+            tendencias = []
     except:
-        return sin_dato
+        tendencias = []
 
-def fila_a_html(row):
-    gan = row["Ganancia Est."]
-    if pd.notna(gan):
-        color  = "#16a34a" if gan > 0 else "#dc2626"
-        gan_td = f'<td style="color:{color};font-weight:bold">{fmt(gan)}</td>'
-    else:
-        gan_td = "<td>—</td>"
-    return (
-        f"<tr>"
-        f"<td>{row['Producto']}</td>"
-        f"<td>{row['Marca']}</td>"
-        f"<td style='text-align:center'>{row['Menciones FB']}</td>"
-        f"<td>{fmt(row['Presupuesto FB'])}</td>"
-        f"<td>{fmt(row['Precio MeLi'])}</td>"
-        f"<td>{fmt(row['Precio Amazon'], 'Sin dato')}</td>"
-        f"<td>{fmt(row['Mejor Costo'])}</td>"
-        f"{gan_td}"
-        f"</tr>"
-    )
+if tendencias:
+    df_meli = pd.DataFrame(tendencias)
+    df_meli.index = df_meli.index + 1
+    df_meli.index.name = "Posición"
+    df_meli.columns = ["Producto en Tendencia", "URL"]
+    df_meli = df_meli[["Producto en Tendencia"]]
 
-cabeceras = ["Producto","Marca","Menciones FB","Presupuesto FB",
-             "Precio MeLi","Precio Amazon","Mejor Costo","Ganancia Est."]
-ths = "".join(f"<th>{h}</th>" for h in cabeceras)
-trs = "".join(fila_a_html(row) for _, row in df.iterrows())
+    st.markdown("""
+    <style>
+    .meli-tabla { width:100%; border-collapse:collapse; font-size:15px; }
+    .meli-tabla th { background:#FFE600; color:#333; padding:10px; text-align:left; }
+    .meli-tabla tr:nth-child(even) { background:#FFFDE7; }
+    .meli-tabla td { padding:8px 12px; border-bottom:1px solid #eee; }
+    .meli-tabla .pos { font-weight:bold; color:#FF7733; font-size:18px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-st.markdown(f"""
-<style>
-  .radar-tabla {{ width:100%; border-collapse:collapse; font-size:14px; }}
-  .radar-tabla th {{ background:#1e3a5f; color:white; padding:8px 12px; text-align:left; }}
-  .radar-tabla tr:nth-child(even) {{ background:#f0f4ff; }}
-  .radar-tabla td {{ padding:7px 12px; border-bottom:1px solid #dde3f0; }}
-</style>
-<table class="radar-tabla">
-  <thead><tr>{ths}</tr></thead>
-  <tbody>{trs}</tbody>
-</table>
-""", unsafe_allow_html=True)
+    filas_meli = ""
+    for i, row in enumerate(tendencias, 1):
+        keyword = row['keyword'].title()
+        filas_meli += f"<tr><td class='pos'>#{i}</td><td>{keyword}</td></tr>"
 
-st.subheader("🔥 Productos más buscados en Facebook")
-fig = px.bar(
-    df, x="Menciones FB", y="Producto", orientation="h",
-    color="Menciones FB", color_continuous_scale="Blues", text="Menciones FB",
-)
-fig.update_layout(
-    yaxis=dict(autorange="reversed"), showlegend=False,
-    height=max(300, len(df) * 55), plot_bgcolor="white",
-)
-st.plotly_chart(fig, use_container_width=True)
-
-st.subheader("💰 Comparador de Precios por Producto")
-producto_sel = st.selectbox("Selecciona un producto:", df["Producto"].tolist())
-fila = df[df["Producto"] == producto_sel].iloc[0]
-
-m1, m2, m3 = st.columns(3)
-m1.metric("💬 Presupuesto Facebook", fmt(fila["Presupuesto FB"], "No especificado"))
-m2.metric("🛒 Precio Mercado Libre", fmt(fila["Precio MeLi"],    "Sin dato"))
-m3.metric("📦 Precio Amazon",        fmt(fila["Precio Amazon"],  "Sin dato"))
-
-if pd.notna(fila["Ganancia Est."]):
-    if fila["Ganancia Est."] > 0:
-        st.success(f"✅ Oportunidad de reventa: **${fila['Ganancia Est.']:,.0f} MXN** por unidad")
-    else:
-        st.error(f"❌ Sin margen: el costo supera el presupuesto en ${abs(fila['Ganancia Est.']):,.0f} MXN")
+    st.markdown(f"""
+    <table class="meli-tabla">
+      <thead><tr><th>#</th><th>🔥 Producto más buscado</th></tr></thead>
+      <tbody>{filas_meli}</tbody>
+    </table>
+    """, unsafe_allow_html=True)
 else:
-    st.info("ℹ️ Sin suficientes datos de precio para calcular ganancia.")
+    st.warning("No se pudo conectar a Mercado Libre en este momento.")
 
 st.divider()
-st.caption("Facebook simulado · Precios de referencia MeLi y Amazon · Monterrey NL")
+
+# ── SECCIÓN 2: Más vendidos Amazon ──────────────────────────
+st.header("📦 Más Vendidos en Amazon México")
+
+mas_vendidos_amz = obtener_mas_vendido_amazon("")
+
+cols = st.columns(2)
+items = list(mas_vendidos_amz.items())
+for i, (categoria, producto) in enumerate(items):
+    with cols[i % 2]:
+        st.markdown(f"""
+        <div style="background:#232F3E;color:white;border-radius:10px;
+                    padding:14px;margin:6px 0;">
+            <div style="color:#FF9900;font-weight:bold;font-size:13px;">
+                {categoria}
+            </div>
+            <div style="font-size:15px;margin-top:4px;">{producto}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+st.divider()
+
+# ── SECCIÓN 3: Demanda en Facebook MTY ──────────────────────
+st.header("💬 Lo que busca la gente en Facebook Monterrey")
+
+posts = obtener_posts_monterrey()
+df_fb = analizar_demanda_y_marcas(posts)
+
+if not df_fb.empty:
+    fig = px.bar(
+        df_fb.head(10),
+        x="Menciones",
+        y="Producto",
+        orientation="h",
+        color="Menciones",
+        color_continuous_scale="Reds",
+        text="Menciones",
+        title="Productos más buscados en grupos de Facebook MTY"
+    )
+    fig.update_layout(
+        yaxis=dict(autorange="reversed"),
+        showlegend=False,
+        height=max(300, len(df_fb) * 55),
+        plot_bgcolor="white",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("📋 Detalle de búsquedas")
+    df_show = df_fb[["Producto","Marca","Menciones","Presupuesto_FB"]].copy()
+    df_show.columns = ["Producto","Marca","Menciones","Presupuesto Promedio FB"]
+    df_show["Presupuesto Promedio FB"] = df_show["Presupuesto Promedio FB"].apply(
+        lambda x: f"${x:,.0f}" if pd.notna(x) else "No especificado"
+    )
+    st.dataframe(df_show, use_container_width=True, hide_index=True)
+else:
+    st.warning("No se detectaron búsquedas en Facebook.")
+
+st.divider()
+
+# ── SECCIÓN 4: Oportunidades cruzadas ───────────────────────
+st.header("🎯 Oportunidades: Lo que buscan vs lo que hay")
+
+if tendencias and not df_fb.empty:
+    keywords_meli = [t['keyword'].lower() for t in tendencias]
+    productos_fb  = df_fb["Producto"].str.lower().tolist()
+
+    coincidencias = []
+    for kw in keywords_meli:
+        for prod in productos_fb:
+            if kw in prod or prod in kw:
+                coincidencias.append({
+                    "Producto"           : kw.title(),
+                    "En tendencia MeLi"  : "✅ Sí",
+                    "Buscado en FB MTY"  : "✅ Sí",
+                    "Oportunidad"        : "🔥 ALTA",
+                })
+
+    if coincidencias:
+        st.success(f"¡Se encontraron {len(coincidencias)} productos que están en tendencia en MeLi Y se buscan en Facebook Monterrey!")
+        st.dataframe(pd.DataFrame(coincidencias), use_container_width=True, hide_index=True)
+    else:
+        st.info("No hay coincidencias directas esta semana entre MeLi y Facebook MTY.")
+
+st.divider()
+st.caption("MeLi vía API oficial · Amazon datos de referencia · Facebook simulado · Monterrey NL 🇲🇽")
