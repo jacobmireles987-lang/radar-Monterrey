@@ -15,18 +15,19 @@ def obtener_tendencias_ml():
 def buscar_precio_promedio_ml(producto_o_marca):
     headers = {"User-Agent": "Mozilla/5.0"}
 
-    # Usamos solo la primera palabra para que MeLi encuentre resultados
-    # Ejemplo: "Celular Samsung" → busca solo "Celular"
-    termino_limpio = producto_o_marca.split()[0] if producto_o_marca else producto_o_marca
-
-    termino_codificado = urllib.parse.quote(termino_limpio)
-    url = f"https://api.mercadolibre.com/sites/MLM/search?q={termino_codificado}&limit=5"
+    # Usamos el término completo para mejor precisión
+    termino_codificado = urllib.parse.quote(producto_o_marca)
+    url = f"https://api.mercadolibre.com/sites/MLM/search?q={termino_codificado}&limit=10"
 
     try:
-        res = requests.get(url, headers=headers, timeout=5)
+        res = requests.get(url, headers=headers, timeout=10)
         if res.status_code == 200:
             resultados = res.json().get("results", [])
-            precios = [item["price"] for item in resultados if item.get("price")]
+            # Filtramos precios razonables (entre $100 y $500,000 MXN)
+            precios = [
+                item["price"] for item in resultados
+                if item.get("price") and 100 < item["price"] < 500000
+            ]
             if precios:
                 return sum(precios) / len(precios)
     except:
