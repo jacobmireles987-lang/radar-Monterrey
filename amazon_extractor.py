@@ -1,24 +1,21 @@
-def obtener_tendencias_ml():
-    return ["Minisplit", "Llantas", "Celular", "Laptop", "iPhone"]
-
-def buscar_precio_promedio_ml(producto_o_marca):
-    texto = producto_o_marca.lower()
+def buscar_precio_amazon(producto):
+    texto = producto.lower()
     precios = {
-        "celular"   : 8500,
-        "samsung"   : 8500,
-        "laptop"    : 15000,
-        "apple"     : 18000,
-        "dell"      : 14000,
-        "llantas"   : 2800,
-        "michelin"  : 2800,
-        "pirelli"   : 2600,
-        "minisplit" : 7200,
-        "minisplits": 7200,
-        "lg"        : 7000,
-        "mirage"    : 6500,
-        "usado"     : 4500,
+        "celular"   : 9999,
+        "samsung"   : 9999,
+        "laptop"    : 17999,
+        "apple"     : 22000,
+        "dell"      : 16000,
+        "llantas"   : 3200,
+        "michelin"  : 3100,
+        "pirelli"   : 2900,
+        "minisplit" : 8999,
+        "minisplits": 8999,
+        "lg"        : 8500,
+        "mirage"    : 7200,
+        "usado"     : 5500,
     }
     for clave, precio in precios.items():
         if clave in texto:
             return precio
-    return 6000
+    return None
