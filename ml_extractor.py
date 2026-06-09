@@ -15,8 +15,8 @@ def obtener_tendencias_ml():
 def buscar_precio_promedio_ml(producto_o_marca):
     headers = {"User-Agent": "Mozilla/5.0"}
 
-    # ── CORRECCIÓN CLAVE: usar solo la primera palabra (el producto)
-    # "Celular Samsung" → "Celular", "Laptop Apple" → "Laptop"
+    # Usamos solo la primera palabra para que MeLi encuentre resultados
+    # Ejemplo: "Celular Samsung" → busca solo "Celular"
     termino_limpio = producto_o_marca.split()[0] if producto_o_marca else producto_o_marca
 
     termino_codificado = urllib.parse.quote(termino_limpio)
