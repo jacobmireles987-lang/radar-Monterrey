@@ -33,7 +33,9 @@ def analizar_demanda_y_marcas(posts):
                 
     if resultados:
         df = pd.DataFrame(resultados)
-        df['Oferta_FB'] = df['Oferta_FB'].replace(0.0, pd.NA) # Ignoramos los que no pusieron precio
+        # FIX: Reemplazamos 0.0 con None, que es 100% seguro para matemáticas
+        df['Oferta_FB'] = df['Oferta_FB'].apply(lambda x: None if x == 0.0 else x)
+        
         resumen = df.groupby(['Producto', 'Marca']).agg(
             Menciones=('Producto', 'size'),
             Presupuesto_FB=('Oferta_FB', 'mean')
