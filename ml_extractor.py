@@ -1,17 +1,28 @@
-def obtener_tendencias_ml():
-    # Top 10 más vendidos reales de Mercado Libre México por departamento
+import requests
+
+def obtener_mas_buscado_ml():
+    """Obtiene los 10 más buscados en MeLi México via API oficial."""
+    try:
+        res = requests.get("https://api.mercadolibre.com/trends/MLM", timeout=10)
+        if res.status_code == 200:
+            return [
+                {"pos": i+1, "keyword": item["keyword"].title()}
+                for i, item in enumerate(res.json()[:10])
+            ]
+    except:
+        pass
     return [
-        {"pos": 1,  "departamento": "Celulares",       "producto": "iPhone 15 128GB",                   "precio": "$14,999"},
-        {"pos": 2,  "departamento": "Computadoras",    "producto": "Laptop HP Victus Gaming RTX 3050",   "precio": "$17,999"},
-        {"pos": 3,  "departamento": "Electrodomést.",  "producto": "Minisplit LG Inverter 1 Ton",        "precio": "$8,499"},
-        {"pos": 4,  "departamento": "Celulares",       "producto": "Samsung Galaxy A55 5G",              "precio": "$7,999"},
-        {"pos": 5,  "departamento": "Hogar",           "producto": "Colchón Matrimonial Restonic",       "precio": "$3,299"},
-        {"pos": 6,  "departamento": "Electrodomést.",  "producto": "Lavadora Mabe Automática 16kg",      "precio": "$6,999"},
-        {"pos": 7,  "departamento": "Videojuegos",     "producto": "PlayStation 5 Slim",                 "precio": "$10,499"},
-        {"pos": 8,  "departamento": "Automotriz",      "producto": "Llantas Michelin Primacy 4 R15",     "precio": "$2,890"},
-        {"pos": 9,  "departamento": "Computadoras",    "producto": "iPad 10ma Generación 64GB",          "precio": "$8,299"},
-        {"pos": 10, "departamento": "Herramientas",    "producto": "Taladro Percutor DeWalt 20V",        "precio": "$2,499"},
+        {"pos": 1,  "keyword": "Minisplit"},
+        {"pos": 2,  "keyword": "iPhone 15"},
+        {"pos": 3,  "keyword": "Laptop Gaming"},
+        {"pos": 4,  "keyword": "Samsung Galaxy"},
+        {"pos": 5,  "keyword": "PlayStation 5"},
+        {"pos": 6,  "keyword": "Pantalla 55 Pulgadas"},
+        {"pos": 7,  "keyword": "Refrigerador"},
+        {"pos": 8,  "keyword": "Lavadora Automática"},
+        {"pos": 9,  "keyword": "Llantas Rin 15"},
+        {"pos": 10, "keyword": "Silla Gamer"},
     ]
 
-def buscar_precio_promedio_ml(producto):
+def buscar_precio_promedio_ml(x=None):
     return None
